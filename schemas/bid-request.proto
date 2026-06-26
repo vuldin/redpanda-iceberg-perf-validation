@@ -1,0 +1,162 @@
+syntax = "proto3";
+
+package openrtb.sample;
+
+// Realistic OpenRTB-style bid request for iceberg perf SIZING.
+//
+// Translation CPU scales with (a) decompressed bytes AND (b) the number of leaf columns
+// decoded + written to parquet. An earlier version concentrated ~90% of bytes in ONE large
+// string field, which is trivially cheap to translate (one parquet column) and badly
+// UNDER-states real cost. This schema instead spreads bytes across ~100 leaf columns via
+// nested messages + repeated groups (imps, device/geo, user/data/segments, banner/video),
+// mirroring a real OpenRTB bidder_request so per-byte translation cost is representative.
+//
+// value_schema_latest resolves the schema by subject <topic>-value and, with NO message-index
+// prefix in the raw record, decodes against the FIRST message defined in the file. So
+// BidderRequest MUST be defined first (proto3 allows forward references to the leaf types
+// below). This is a representative OpenRTB-shaped schema for perf testing, not any specific
+// production schema. What matters is the leaf-column count + byte distribution, not exact fields.
+
+message BidderRequest {
+  string          id           = 1;
+  int32           at           = 2;
+  int32           tmax         = 3;
+  repeated string cur          = 4;
+  repeated string bcat         = 5;
+  repeated string badv         = 6;
+  repeated string wseat        = 7;
+  int32           allimps      = 8;
+  int32           test         = 9;
+  repeated Imp    imp          = 10;
+  Device          device       = 11;
+  User            user         = 12;
+  Source          source       = 13;
+  Regs            regs         = 14;
+  string          exchange     = 15;
+  int32           auction_type = 16;
+  string          bidderkey    = 17;
+  string          partner      = 18;
+  string          dealid       = 19;
+  repeated string keywords     = 20;
+  int64           timestamp_ms = 21;
+  string          request_id   = 22;
+  string          markup       = 23;  // moderate (~512 B) ad markup, no longer dominant
+  string          ext          = 24;
+}
+
+message Geo {
+  double lat        = 1;
+  double lon        = 2;
+  string country    = 3;
+  string region     = 4;
+  string metro      = 5;
+  string city       = 6;
+  string zip        = 7;
+  int32  type       = 8;
+  int32  utcoffset  = 9;
+  string ipservice  = 10;
+}
+
+message Device {
+  string ua             = 1;
+  string ip             = 2;
+  string make           = 3;
+  string model          = 4;
+  string os             = 5;
+  string osv            = 6;
+  string hwv            = 7;
+  int32  h              = 8;
+  int32  w              = 9;
+  int32  ppi            = 10;
+  int32  js             = 11;
+  int32  devicetype     = 12;
+  int32  connectiontype = 13;
+  string ifa            = 14;
+  int32  lmt            = 15;
+  string language       = 16;
+  string carrier        = 17;
+  string mccmnc         = 18;
+  Geo    geo            = 19;
+}
+
+message Segment {
+  string id    = 1;
+  string name  = 2;
+  string value = 3;
+}
+
+message Data {
+  string          id      = 1;
+  string          name    = 2;
+  repeated Segment segment = 3;
+}
+
+message User {
+  string        id         = 1;
+  string        buyeruid   = 2;
+  int32         yob        = 3;
+  string        gender     = 4;
+  string        keywords   = 5;
+  string        customdata = 6;
+  repeated Data data       = 7;
+}
+
+message Banner {
+  int32          w        = 1;
+  int32          h        = 2;
+  int32          pos      = 3;
+  string         mimes    = 4;
+  int32          topframe = 5;
+  repeated int32 btype    = 6;
+  repeated int32 battr    = 7;
+  string         id       = 8;
+}
+
+message Video {
+  repeated string mimes           = 1;
+  int32           minduration     = 2;
+  int32           maxduration     = 3;
+  repeated int32  protocols       = 4;
+  int32           w               = 5;
+  int32           h               = 6;
+  int32           startdelay      = 7;
+  int32           placement       = 8;
+  int32           linearity       = 9;
+  int32           skip            = 10;
+  int32           skipafter       = 11;
+  int32           sequence        = 12;
+  repeated int32  battr           = 13;
+  int32           maxbitrate      = 14;
+  int32           minbitrate      = 15;
+  repeated int32  playbackmethod  = 16;
+  repeated int32  delivery        = 17;
+  int32           pos             = 18;
+  repeated int32  api             = 19;
+}
+
+message Imp {
+  string id                = 1;
+  string tagid             = 2;
+  double bidfloor          = 3;
+  string bidfloorcur       = 4;
+  int32  instl             = 5;
+  int32  secure            = 6;
+  string displaymanager    = 7;
+  string displaymanagerver = 8;
+  int32  clickbrowser      = 9;
+  int32  exp               = 10;
+  Banner banner            = 11;
+  Video  video             = 12;
+}
+
+message Source {
+  int32  fd     = 1;
+  string tid    = 2;
+  string pchain = 3;
+}
+
+message Regs {
+  int32  coppa      = 1;
+  int32  gdpr       = 2;
+  string us_privacy = 3;
+}

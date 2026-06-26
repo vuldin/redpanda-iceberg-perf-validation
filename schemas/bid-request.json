@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "title": "BidderRequest",
+  "properties": {
+    "request_id": { "type": "string" },
+    "timestamp_ms": { "type": "integer" },
+    "exchange": { "type": "string" },
+    "device_type": { "type": "string" },
+    "geo_country": { "type": "string" },
+    "user_segment_count": { "type": "integer" },
+    "floor_price_cents": { "type": "integer" },
+    "keywords": { "type": "array", "items": { "type": "string" } },
+    "xml_payload": { "type": "string" }
+  },
+  "required": ["request_id", "timestamp_ms", "xml_payload"]
+}

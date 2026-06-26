@@ -1,0 +1,34 @@
+input:
+  redpanda_migrator:
+    auto_replay_nacks: true
+    client_id: rp-iceberg-test-migrator-input
+    consumer_group: rp-iceberg-test-migrator
+    regexp_topics: false
+    partition_buffer_bytes: 8MB
+    max_yield_batch_bytes: 1MB
+    sasl: []
+    seed_brokers:
+      - "${SOURCE_BROKER_0}:9092"
+      - "${SOURCE_BROKER_1}:9092"
+      - "${SOURCE_BROKER_2}:9092"
+    start_offset: latest
+    tls:
+      enabled: false
+    topics:
+      - bid-request
+
+output:
+  redpanda_migrator:
+    client_id: rp-iceberg-test-migrator-output
+    sasl: []
+    seed_brokers:
+      - "${TARGET_BROKER_0}:9092"
+      - "${TARGET_BROKER_1}:9092"
+      - "${TARGET_BROKER_2}:9092"
+    tls:
+      enabled: true
+      skip_cert_verify: true
+    allow_auto_topic_creation: false
+    topic: ${! metadata("kafka_topic").or(throw("missing kafka_topic metadata")) }
+    compression: zstd
+    max_in_flight: 50

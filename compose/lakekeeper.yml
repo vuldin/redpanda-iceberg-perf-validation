@@ -1,0 +1,24 @@
+# Iceberg REST catalog for the target cluster.
+# Uses tabulario/iceberg-rest (SQLite-backed, single container). Sufficient for
+# perf validation; we are not measuring catalog perf.
+#
+# Runs on the target cluster's connect node. The target Redpanda brokers point
+# at this catalog via iceberg_rest_catalog_endpoint=http://<connect-node>:8181.
+#
+# Backing parquet storage is S3 (the bucket is created by the target tf
+# module's S3 component, or by hand under this project/).
+
+services:
+  iceberg-rest:
+    image: tabulario/iceberg-rest:1.5.0
+    container_name: iceberg-rest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      CATALOG_WAREHOUSE: s3://${ICEBERG_BUCKET}/warehouse
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_REGION: ${AWS_REGION:-us-east-2}
+      AWS_REGION: ${AWS_REGION:-us-east-2}
+      # IAM instance role on the connect node provides S3 creds; no static keys.
+    ports:
+      - "8181:8181"

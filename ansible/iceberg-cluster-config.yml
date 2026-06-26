@@ -1,0 +1,72 @@
+# Post-provision iceberg config for the target cluster.
+# Run AFTER provision-cluster-tiered-storage.yml has stood up the brokers.
+#
+# Usage:
+#   export ICEBERG_CATALOG_HOST=<connect-node-ip>
+#   export ICEBERG_BUCKET=<s3-bucket-name>
+#   ansible-playbook -i ../ansible/hosts.target.ini iceberg-cluster-config.yml
+
+---
+- name: Configure iceberg cluster properties
+  hosts: redpanda
+  vars:
+    iceberg_catalog_host: "{{ lookup('env','ICEBERG_CATALOG_HOST') }}"
+    iceberg_bucket: "{{ lookup('env','ICEBERG_BUCKET') }}"
+  tasks:
+    - name: Sanity-check env vars
+      ansible.builtin.assert:
+        that:
+          - iceberg_catalog_host | length > 0
+          - iceberg_bucket | length > 0
+        fail_msg: "ICEBERG_CATALOG_HOST and ICEBERG_BUCKET must be set"
+
+    - name: Set iceberg_enabled=true
+      ansible.builtin.command:
+        cmd: rpk cluster config set iceberg_enabled true
+      run_once: true
+      delegate_to: "{{ groups['redpanda'][0] }}"
+
+    # Endpoint MUST be set before catalog_type=rest, or rpk rejects the change with
+    # "Must set iceberg_rest_catalog_endpoint when iceberg_catalog_type is set to 'rest'".
+    # iceberg_catalog_host must be the catalog's PRIVATE IP - brokers cannot reach the
+    # connect node's public IP (hairpin times out).
+    - name: Set iceberg_rest_catalog_endpoint
+      ansible.builtin.command:
+        cmd: "rpk cluster config set iceberg_rest_catalog_endpoint http://{{ iceberg_catalog_host }}:8181"
+      run_once: true
+      delegate_to: "{{ groups['redpanda'][0] }}"
+
+    - name: Set iceberg_catalog_type=rest
+      ansible.builtin.command:
+        cmd: rpk cluster config set iceberg_catalog_type rest
+      run_once: true
+      delegate_to: "{{ groups['redpanda'][0] }}"
+
+    - name: Set iceberg_target_lag_ms default to 60000 (T0/T2 baseline)
+      ansible.builtin.command:
+        cmd: rpk cluster config set iceberg_target_lag_ms 60000
+      run_once: true
+      delegate_to: "{{ groups['redpanda'][0] }}"
+
+    - name: Set datalake_translator_flush_bytes default to 32 MiB
+      ansible.builtin.command:
+        cmd: rpk cluster config set datalake_translator_flush_bytes 33554432
+      run_once: true
+      delegate_to: "{{ groups['redpanda'][0] }}"
+
+    - name: Restart redpanda (iceberg_enabled requires restart)
+      ansible.builtin.service:
+        name: redpanda
+        state: restarted
+      throttle: 1  # rolling, one broker at a time
+
+    - name: Wait for cluster to report healthy
+      ansible.builtin.command:
+        cmd: rpk cluster health --exit-when-healthy --watch
+      run_once: true
+      delegate_to: "{{ groups['redpanda'][0] }}"
+      register: health
+      changed_when: false
+      retries: 30
+      delay: 10
+      until: health.rc == 0

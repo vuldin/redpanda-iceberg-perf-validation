@@ -1,0 +1,26 @@
+# Synthetic producer that writes JSON-encoded records to the source cluster.
+# Runs on the target connect node (single host for all services-side work)
+# but points its brokers at the source cluster.
+#
+# Built from ../producer/Dockerfile. The producer image is built locally on
+# the connect node via setup.sh.
+
+services:
+  producer:
+    image: iceberg-perf-producer:latest
+    container_name: iceberg-perf-producer
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      # PRODUCER_BROKERS lets us point straight at the TARGET cluster (direct-to-iceberg,
+      # no migrator); falls back to the source brokers for the legacy path.
+      BROKERS: "${PRODUCER_BROKERS:-${SOURCE_BROKER_0}:9092,${SOURCE_BROKER_1}:9092,${SOURCE_BROKER_2}:9092}"
+      TOPIC: "${PRODUCER_TOPIC:-bid-request}"
+      TARGET_MIBPS: "${PRODUCER_MIBPS:-160}"
+      XML_PAYLOAD_BYTES: "${PRODUCER_XML_BYTES:-512}"
+      MARKUP_POOL: "${PRODUCER_MARKUP_POOL:-1024}"
+      WORKERS: "${PRODUCER_WORKERS:-8}"
+      TLS_ENABLED: "${PRODUCER_TLS:-false}"
+      METRICS_PORT: "9090"
+    ports:
+      - "9091:9090"
